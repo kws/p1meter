@@ -1,0 +1,185 @@
+Below is a **concise, implementation-oriented spec** suitable for kicking off the project and handing to an agent (human or LLM). It’s deliberately tight and unambiguous.
+
+---
+
+# DSMR → MQTT Bridge
+
+**Project Specification (v0.1)**
+
+## 1. Purpose
+
+Build a small, reliable daemon that reads **raw DSMR P1 telegrams** from a Dutch smart meter over a serial connection and publishes them **unchanged** to MQTT for downstream decoding and processing.
+
+The system prioritises:
+
+* correctness of framing
+* operational robustness
+* low latency
+* minimal dependencies
+
+---
+
+## 2. Scope
+
+### In scope
+
+* Read DSMR telegrams from a P1 port via USB serial
+* Detect telegram boundaries (`/` … `!`)
+* Publish full telegrams to MQTT
+* Publish status (online/offline) via MQTT LWT
+* Run unattended on a Raspberry Pi
+* Cross-compile from macOS
+
+### Out of scope (explicitly)
+
+* Parsing or interpreting OBIS values
+* Storing historical data
+* UI / dashboards
+* Home Assistant / OpenHAB bindings
+* Meter configuration
+
+---
+
+## 3. Target Environment
+
+### Build environment
+
+* macOS
+* Go ≥ 1.21
+* Cross-compilation using Go environment variables
+
+### Runtime environment
+
+* Raspberry Pi (Linux)
+* USB FTDI-based P1 cable
+* DSMR 5.0 smart meter (e.g. Landis+Gyr E360)
+* MQTT broker (e.g. Mosquitto)
+
+---
+
+## 4. Inputs
+
+### Serial (P1)
+
+* Device: `/dev/ttyUSB0` (configurable)
+* Protocol: DSMR
+* Encoding: ASCII
+* Settings:
+
+  * Baud: `115200`
+  * Data bits: `8`
+  * Parity: `None`
+  * Stop bits: `1`
+
+### Telegram framing
+
+* **Start:** line beginning with `/`
+* **End:** line beginning with `!` (with optional CRC)
+* All data between start and end inclusive is a single atomic telegram
+
+---
+
+## 5. Outputs
+
+### MQTT Topics
+
+| Topic               | Retained | Payload                   |
+| ------------------- | -------- | ------------------------- |
+| `dsmr/raw/telegram` | No       | Full DSMR telegram text   |
+| `dsmr/raw/latest`   | Yes      | Most recent full telegram |
+| `dsmr/status`       | Yes      | `online` / `offline`      |
+
+### MQTT Behaviour
+
+* QoS: `1`
+* Clean session
+* Last Will and Testament:
+
+  * topic: `dsmr/status`
+  * payload: `offline`
+  * retained: `true`
+
+---
+
+## 6. Behavioural Requirements
+
+### Serial handling
+
+* Ignore all input until a `/` start marker is seen
+* Accumulate lines until a `!` end marker is seen
+* Publish telegram atomically
+* On serial read error:
+
+  * Close device
+  * Retry with backoff
+  * Do not crash
+
+### MQTT handling
+
+* Auto-reconnect on broker failure
+* Do not block serial reads on MQTT publish
+* Drop telegrams if internal queue is full (log warning)
+
+### Shutdown
+
+* Handle `SIGINT` / `SIGTERM`
+* Publish `offline` status before exit
+* Exit cleanly
+
+---
+
+## 7. Configuration
+
+Configuration must be possible via:
+
+* command-line flags
+* environment variables
+
+Minimum config:
+
+* serial device path
+* MQTT broker URL
+* MQTT client ID
+
+---
+
+## 8. Non-functional Requirements
+
+* Single static binary
+* No CGO dependencies
+* Memory footprint < 20 MB
+* CPU usage negligible on Raspberry Pi
+* No external runtime dependencies beyond MQTT broker
+
+---
+
+## 9. Deliverables
+
+* Go source code
+* `go.mod` / `go.sum`
+* Cross-compilation instructions (macOS → Raspberry Pi)
+* Example `systemd` service file (optional, but recommended)
+* README (brief)
+
+---
+
+## 10. Definition of Done
+
+The project is considered complete when:
+
+* The agent can cross-compile on macOS
+* The binary runs on a Raspberry Pi
+* Raw DSMR telegrams appear on the MQTT topic
+* Gas and electricity data are present
+* The process survives USB or MQTT disconnects without manual intervention
+
+---
+
+If you want, next I can:
+
+* turn this into a **GitHub issue set**
+* generate a **README.md** from this spec
+* or refine it into a **v1.0 hardening checklist** (metrics, CRC validation, watchdogs)
+
+Just say which.
+
