@@ -12,4 +12,9 @@ DSMR_MQTT_PASSWORD=your_password_here
 # DSMR_MQTT_BROKER=tcp://localhost:1883
 # DSMR_MQTT_CLIENT_ID=dsmr-bridge
 # DSMR_MQTT_USERNAME=mqttuser
+# DSMR_MQTT_TLS=1
 # DSMR_VERBOSE=false
+
+# Security Note: For production, use TLS to encrypt connections:
+# - Use ssl:// or tls:// URL scheme, or
+# - Set DSMR_MQTT_TLS=1 with tcp:// URL

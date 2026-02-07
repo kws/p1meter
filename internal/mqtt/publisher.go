@@ -1,8 +1,10 @@
 package mqtt
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +23,7 @@ type Publisher struct {
 	clientID string
 	username string
 	password string
+	useTLS   bool
 	client   mqtt.Client
 	queue    chan string
 	wg       sync.WaitGroup
@@ -29,12 +32,13 @@ type Publisher struct {
 }
 
 // NewPublisher creates a new MQTT publisher
-func NewPublisher(broker, clientID, username, password string, verbose bool) *Publisher {
+func NewPublisher(broker, clientID, username, password string, useTLS bool, verbose bool) *Publisher {
 	return &Publisher{
 		broker:   broker,
 		clientID: clientID,
 		username: username,
 		password: password,
+		useTLS:   useTLS,
 		queue:    make(chan string, 100),
 		verbose:  verbose,
 	}
@@ -91,8 +95,24 @@ func (p *Publisher) connect() error {
 	if p.verbose {
 		log.Printf("Connecting to MQTT broker: %s (client ID: %s)", p.broker, p.clientID)
 	}
+
+	// Determine if TLS should be used based on URL scheme or explicit flag
+	brokerURL := p.broker
+	useTLS := p.useTLS
+
+	// Check URL scheme for TLS indication
+	if strings.HasPrefix(strings.ToLower(brokerURL), "ssl://") ||
+		strings.HasPrefix(strings.ToLower(brokerURL), "tls://") ||
+		strings.HasPrefix(strings.ToLower(brokerURL), "wss://") {
+		useTLS = true
+		// Convert ssl:// to tcp:// for the broker URL (TLS is configured separately)
+		brokerURL = strings.Replace(brokerURL, "ssl://", "tcp://", 1)
+		brokerURL = strings.Replace(brokerURL, "tls://", "tcp://", 1)
+		brokerURL = strings.Replace(brokerURL, "wss://", "ws://", 1)
+	}
+
 	opts := mqtt.NewClientOptions()
-	opts.AddBroker(p.broker)
+	opts.AddBroker(brokerURL)
 	opts.SetClientID(p.clientID)
 	opts.SetCleanSession(true)
 	opts.SetAutoReconnect(true)
@@ -101,6 +121,22 @@ func (p *Publisher) connect() error {
 	opts.SetConnectTimeout(10 * time.Second)
 	opts.SetPingTimeout(10 * time.Second)
 	opts.SetWriteTimeout(10 * time.Second)
+
+	// Configure TLS if enabled
+	if useTLS {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: false, // Verify server certificate by default
+			MinVersion:         tls.VersionTLS12,
+		}
+		opts.SetTLSConfig(tlsConfig)
+		if p.verbose {
+			log.Println("TLS enabled for MQTT connection")
+		}
+	} else {
+		if p.verbose {
+			log.Println("Warning: TLS not enabled - connection is not encrypted")
+		}
+	}
 
 	// Set username and password if provided
 	if p.username != "" {
@@ -169,6 +205,15 @@ func (p *Publisher) publishLoop() {
 				time.Sleep(5 * time.Second)
 				continue
 			}
+			// Get the client again after reconnection
+			p.mu.Lock()
+			client = p.client
+			p.mu.Unlock()
+		}
+
+		// Validate telegram size before publishing (safety check)
+		if len(telegram) > 10*1024 {
+			log.Printf("Warning: Telegram size (%d bytes) exceeds recommended limit, publishing anyway", len(telegram))
 		}
 
 		// Publish to telegram topic (not retained)
