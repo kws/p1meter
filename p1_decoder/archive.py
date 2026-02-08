@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
@@ -15,7 +17,7 @@ FLUSH_PERIOD = timedelta(minutes=1)
 FLUSH_LINES = 50
 
 
-async def mqtt_loop(send_stream: anyio.abc.SendStream):
+async def mqtt_loop(send_stream: anyio.abc.ObjectSendStream[str]):
     try:
         async for raw_telegram in mqtt_subscriber():
             try:
@@ -27,7 +29,8 @@ async def mqtt_loop(send_stream: anyio.abc.SendStream):
         logger.error(f"MQTT subscriber error: {e}", exc_info=True)
         raise  # Re-raise to allow task group to handle
 
-async def test_loop(send_stream: anyio.abc.SendStream):
+
+async def test_loop(send_stream: anyio.abc.ObjectSendStream[str]):
     counter = 0
     while True:
         await send_stream.send(f"Test {counter}")
@@ -36,8 +39,8 @@ async def test_loop(send_stream: anyio.abc.SendStream):
             raise ValueError("Test loop cancelled")
         await anyio.sleep(0.1)
 
-class ArchiveWriter:
 
+class ArchiveWriter:
     def __init__(self, archive_path: Path):
         self.archive_path = archive_path
         self._total_lines_written = 0
@@ -45,7 +48,7 @@ class ArchiveWriter:
         self._lines_written = 0
         self._last_flush_time = datetime.now(EUROPE_AMSTERDAM)
 
-    async def write_loop(self, receive_stream: anyio.abc.ReceiveStream):
+    async def write_loop(self, receive_stream: anyio.abc.ObjectReceiveStream[str]):
         async with anyio.create_task_group() as tg:
             tg.start_soon(self._flush_loop)
             tg.start_soon(self._rollover_loop)
@@ -72,7 +75,9 @@ class ArchiveWriter:
         self._lines_written = 0
         self._last_flush_time = datetime.now(EUROPE_AMSTERDAM)
         await self._current_file.flush()
-        logger.info(f"Flushed file {self._current_file.name} after writing {self._total_lines_written} lines")
+        logger.info(
+            f"Flushed file {self._current_file.name} after writing {self._total_lines_written} lines"
+        )
 
     async def _write_to_archive(self, message: str):
         # Input validation (nice to have)
@@ -80,14 +85,16 @@ class ArchiveWriter:
             logger.warning("Received None message, skipping")
             return
         if not isinstance(message, str):
-            logger.warning(f"Received non-string message (type: {type(message).__name__}), skipping")
+            logger.warning(
+                f"Received non-string message (type: {type(message).__name__}), skipping"
+            )
             return
         if not message:
             logger.warning("Received empty message, skipping")
             return
 
         timestamp = datetime.now(EUROPE_AMSTERDAM)
-        
+
         # Open file if needed
         if self._current_file is None:
             try:
@@ -97,42 +104,67 @@ class ArchiveWriter:
                 try:
                     archive_path.mkdir(parents=True, exist_ok=True)
                 except (OSError, PermissionError) as e:
-                    logger.error(f"Failed to create archive directory {archive_path}: {e}", exc_info=True)
+                    logger.error(
+                        f"Failed to create archive directory {archive_path}: {e}",
+                        exc_info=True,
+                    )
                     return
-                
+
                 try:
                     file_path = archive_path / f"{timestamps_str}.ndjson"
-                    self._current_file = await aiofiles.open(file_path, mode='w', encoding='utf-8')
+                    self._current_file = await aiofiles.open(
+                        file_path, mode="w", encoding="utf-8"
+                    )
                     logger.info(f"Opened new archive file: {file_path}")
                 except (OSError, PermissionError) as e:
-                    logger.error(f"Failed to open archive file {file_path}: {e}", exc_info=True)
+                    logger.error(
+                        f"Failed to open archive file {file_path}: {e}", exc_info=True
+                    )
                     return
             except Exception as e:
-                logger.error(f"Unexpected error opening archive file: {e}", exc_info=True)
+                logger.error(
+                    f"Unexpected error opening archive file: {e}", exc_info=True
+                )
                 return
 
         # Write message to file
         try:
             self._total_lines_written += 1
             try:
-                json_line = json.dumps({"ts_utc": timestamp.astimezone(UTC).isoformat(), "seq": self._total_lines_written, "raw": message, "raw_bytes": len(message)})
+                json_line = json.dumps(
+                    {
+                        "ts_utc": timestamp.astimezone(UTC).isoformat(),
+                        "seq": self._total_lines_written,
+                        "raw": message,
+                        "raw_bytes": len(message),
+                    }
+                )
             except (TypeError, ValueError) as e:
-                logger.error(f"Failed to serialize message to JSON (seq: {self._total_lines_written}, message length: {len(message)}): {e}", exc_info=True)
+                logger.error(
+                    f"Failed to serialize message to JSON (seq: {self._total_lines_written}, message length: {len(message)}): {e}",
+                    exc_info=True,
+                )
                 return
-            
+
             await self._current_file.write(json_line)
             await self._current_file.write("\n")
             self._lines_written += 1
-            
+
             if self._lines_written >= FLUSH_LINES:
                 await self._flush()
         except (OSError, PermissionError) as e:
-            logger.error(f"Failed to write to archive file (seq: {self._total_lines_written}): {e}", exc_info=True)
+            logger.error(
+                f"Failed to write to archive file (seq: {self._total_lines_written}): {e}",
+                exc_info=True,
+            )
             # Continue processing next message
         except Exception as e:
-            logger.error(f"Unexpected error writing to archive (seq: {self._total_lines_written}): {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error writing to archive (seq: {self._total_lines_written}): {e}",
+                exc_info=True,
+            )
             # Continue processing next message
-            
+
     async def _flush_loop(self):
         while True:
             try:
@@ -142,7 +174,9 @@ class ArchiveWriter:
                         try:
                             await self._flush()
                         except Exception as e:
-                            logger.error(f"Error flushing file in flush loop: {e}", exc_info=True)
+                            logger.error(
+                                f"Error flushing file in flush loop: {e}", exc_info=True
+                            )
                             # Continue loop despite flush failure
 
                 time_to_next_flush = (self._last_flush_time + FLUSH_PERIOD) - now
@@ -166,9 +200,14 @@ class ArchiveWriter:
                             self._last_flush_time = datetime.now(EUROPE_AMSTERDAM)
                             self._lines_written = 0
                             await current_file.close()
-                            logger.info(f"Rolled over to new day, closed file: {current_file.name}")
+                            logger.info(
+                                f"Rolled over to new day, closed file: {current_file.name}"
+                            )
                         except Exception as e:
-                            logger.error(f"Error closing file during rollover: {e}", exc_info=True)
+                            logger.error(
+                                f"Error closing file during rollover: {e}",
+                                exc_info=True,
+                            )
                             # Continue loop despite close failure
 
                 await anyio.sleep(1)
@@ -176,7 +215,7 @@ class ArchiveWriter:
                 logger.error(f"Unexpected error in rollover loop: {e}", exc_info=True)
                 # Continue loop to prevent complete failure
                 await anyio.sleep(1)
-                    
+
 
 async def main():
     send_stream, receive_stream = anyio.create_memory_object_stream(max_buffer_size=100)
@@ -188,10 +227,11 @@ async def main():
         tg.start_soon(mqtt_loop, send_stream)
         # tg.start_soon(test_loop, send_stream)
         tg.start_soon(archive_writer.write_loop, receive_stream)
- 
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     anyio.run(main)
