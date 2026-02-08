@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  p1-decoder:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: p1-decoder
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Mount logs folder to archive files into
+      - ../logs:/app/logs
+    working_dir: /app
+
