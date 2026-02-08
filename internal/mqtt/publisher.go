@@ -13,7 +13,6 @@ import (
 
 const (
 	topicTelegram = "dsmr/raw/telegram"
-	topicLatest   = "dsmr/raw/latest"
 	topicStatus   = "dsmr/status"
 )
 
