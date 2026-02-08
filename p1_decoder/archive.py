@@ -190,18 +190,28 @@ class ArchiveWriter:
     async def _rollover_loop(self):
         while True:
             try:
+                now = datetime.now(EUROPE_AMSTERDAM)
+                
+                # Calculate time until next hour boundary
+                next_hour = (now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
+                time_to_next_hour = next_hour - now
+                sleep_seconds = max(0.0, time_to_next_hour.total_seconds())
+                
+                await anyio.sleep(sleep_seconds)
+                
+                # Now we're at or past the hour boundary, check if rollover is needed
                 if self._current_file is not None:
-                    day_of_last_flush = self._last_flush_time.date()
-                    day_of_now = datetime.now(EUROPE_AMSTERDAM).date()
+                    hour_of_last_flush: int = self._last_flush_time.hour
+                    hour_of_now: int = datetime.now(EUROPE_AMSTERDAM).hour
 
-                    if day_of_last_flush != day_of_now:
+                    if hour_of_last_flush != hour_of_now:
                         try:
                             current_file, self._current_file = self._current_file, None
                             self._last_flush_time = datetime.now(EUROPE_AMSTERDAM)
                             self._lines_written = 0
                             await current_file.close()
                             logger.info(
-                                f"Rolled over to new day, closed file: {current_file.name}"
+                                f"Rolled over to a new hour, closed file: {current_file.name}"
                             )
                         except Exception as e:
                             logger.error(
@@ -209,12 +219,11 @@ class ArchiveWriter:
                                 exc_info=True,
                             )
                             # Continue loop despite close failure
-
-                await anyio.sleep(1)
             except Exception as e:
                 logger.error(f"Unexpected error in rollover loop: {e}", exc_info=True)
                 # Continue loop to prevent complete failure
-                await anyio.sleep(1)
+                # Sleep a bit before retrying to avoid tight error loop
+                await anyio.sleep(60)
 
 
 async def main():
