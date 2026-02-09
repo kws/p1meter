@@ -159,7 +159,7 @@ def split_telegram_dict(telegram_dict: dict) -> tuple[dict, dict]:
 
 def to_readings(telegram_dict: dict) -> tuple[ElectricityReading, GasReading]:
     electricity_reading = ElectricityReading(
-        timestamp=parse_timestamp(telegram_dict["0-0:1.0.0"]).timestamp(),
+        timestamp=int(parse_timestamp(telegram_dict["0-0:1.0.0"]).timestamp()),
         meter_id=telegram_dict["0-0:96.1.1"],
         import_t1_kwh=telegram_dict["1-0:1.8.1"],
         import_t2_kwh=telegram_dict["1-0:1.8.2"],
@@ -183,7 +183,7 @@ def to_readings(telegram_dict: dict) -> tuple[ElectricityReading, GasReading]:
     )
     
     timestamp_str, reading_m3 = telegram_dict["0-1:24.2.1"]
-    timestamp = parse_timestamp(timestamp_str).timestamp()
+    timestamp = int(parse_timestamp(timestamp_str).timestamp())
 
     gas_reading = GasReading(
         timestamp=timestamp,
