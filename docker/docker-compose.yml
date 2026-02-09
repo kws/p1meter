@@ -11,4 +11,14 @@ services:
       # Mount logs folder to archive files into
       - ../logs:/app/archive
     working_dir: /app
+  p1-stream:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: p1-stream
+    restart: unless-stopped
+    env_file:
+      - .env
+    working_dir: /app
+    command: python -m p1_decoder.stream
 
