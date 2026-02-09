@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
+import lzma
 from pathlib import Path
+import shutil
+from typing import Protocol
+from aiomqtt.types import P
 import anyio
 from p1_decoder._anyio import setup_scope_signal_handlers
 from p1_decoder._mqtt import mqtt_subscriber
@@ -15,6 +20,15 @@ logger = logging.getLogger(__name__)
 
 FLUSH_PERIOD = timedelta(minutes=1)
 FLUSH_LINES = 50
+
+class AsyncClosable(Protocol):
+    async def close(self) -> None: ...
+    
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ArchiveFileReference:
+    path: Path
+    timestamp: datetime
+    out: AsyncClosable
 
 
 async def mqtt_loop(send_stream: anyio.abc.ObjectSendStream[str]):
@@ -42,16 +56,16 @@ async def test_loop(send_stream: anyio.abc.ObjectSendStream[str]):
 
 class ArchiveWriter:
     def __init__(self, archive_path: Path):
-        self.archive_path = archive_path
-        self._total_lines_written = 0
-        self._current_file = None
-        self._lines_written = 0
-        self._last_flush_time = datetime.now(EUROPE_AMSTERDAM)
+        self.archive_path: Path = archive_path
+        self._total_lines_written: int = 0
+        self._lines_written: int = 0
+        self._current_file: ArchiveFileReference | None = None
+        self._last_flush_time: datetime = datetime.now(EUROPE_AMSTERDAM)
 
     async def write_loop(self, receive_stream: anyio.abc.ObjectReceiveStream[str]):
         async with anyio.create_task_group() as tg:
             tg.start_soon(self._flush_loop)
-            tg.start_soon(self._rollover_loop)
+            tg.start_soon(self._hourly_rollover_loop)
 
             try:
                 async for message in receive_stream:
@@ -66,17 +80,17 @@ class ArchiveWriter:
     async def _close(self):
         if self._current_file is not None:
             current_file, self._current_file = self._current_file, None
-            await current_file.close()
-            logger.info(f"Closed file {current_file.name}")
+            await current_file.out.close()
+            logger.info(f"Closed file {current_file.path.name}")
 
     async def _flush(self):
         if self._current_file is None:
             return
-        self._lines_written = 0
+        lines_written, self._lines_written = self._lines_written, 0
         self._last_flush_time = datetime.now(EUROPE_AMSTERDAM)
-        await self._current_file.flush()
+        await self._current_file.out.flush()
         logger.info(
-            f"Flushed file {self._current_file.name} after writing {self._total_lines_written} lines"
+            f"Flushed file {self._current_file.path.name} after writing {self._total_lines_written} lines ({lines_written} this file)"
         )
 
     async def _write_to_archive(self, message: str):
@@ -112,9 +126,10 @@ class ArchiveWriter:
 
                 try:
                     file_path = archive_path / f"{timestamps_str}.ndjson"
-                    self._current_file = await aiofiles.open(
+                    out = await aiofiles.open(
                         file_path, mode="w", encoding="utf-8"
                     )
+                    self._current_file = ArchiveFileReference(path=file_path, timestamp=timestamp, out=out)
                     logger.info(f"Opened new archive file: {file_path}")
                 except (OSError, PermissionError) as e:
                     logger.error(
@@ -146,12 +161,14 @@ class ArchiveWriter:
                 )
                 return
 
-            await self._current_file.write(json_line)
-            await self._current_file.write("\n")
+            await self._current_file.out.write(json_line)
+            await self._current_file.out.write("\n")
             self._lines_written += 1
+            
 
             if self._lines_written >= FLUSH_LINES:
                 await self._flush()
+
         except (OSError, PermissionError) as e:
             logger.error(
                 f"Failed to write to archive file (seq: {self._total_lines_written}): {e}",
@@ -187,7 +204,7 @@ class ArchiveWriter:
                 # Continue loop to prevent complete failure
                 await anyio.sleep(FLUSH_PERIOD.total_seconds())
 
-    async def _rollover_loop(self):
+    async def _hourly_rollover_loop(self):
         while True:
             try:
                 now = datetime.now(EUROPE_AMSTERDAM)
@@ -201,30 +218,45 @@ class ArchiveWriter:
                 
                 # Now we're at or past the hour boundary, check if rollover is needed
                 if self._current_file is not None:
-                    hour_of_last_flush: int = self._last_flush_time.hour
+                    hour_last_opened: int = self._current_file.timestamp.hour
                     hour_of_now: int = datetime.now(EUROPE_AMSTERDAM).hour
 
-                    if hour_of_last_flush != hour_of_now:
-                        try:
-                            current_file, self._current_file = self._current_file, None
-                            self._last_flush_time = datetime.now(EUROPE_AMSTERDAM)
-                            self._lines_written = 0
-                            await current_file.close()
-                            logger.info(
-                                f"Rolled over to a new hour, closed file: {current_file.name}"
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Error closing file during rollover: {e}",
-                                exc_info=True,
-                            )
-                            # Continue loop despite close failure
+                    if hour_last_opened != hour_of_now:
+                        await self._rollover()
+
             except Exception as e:
                 logger.error(f"Unexpected error in rollover loop: {e}", exc_info=True)
                 # Continue loop to prevent complete failure
                 # Sleep a bit before retrying to avoid tight error loop
                 await anyio.sleep(60)
 
+    async def _rollover(self):
+        try:
+            current_file, self._current_file = self._current_file, None
+            self._last_flush_time = datetime.now(EUROPE_AMSTERDAM)
+            self._lines_written = 0
+            await current_file.out.close()
+            await anyio.to_thread.run_sync(self._blocking_compress_file, current_file.path)
+            logger.info(
+                f"Rolled over to a new hour, closed file: {current_file.path.name}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Error closing file during rollover: {e}",
+                exc_info=True,
+            )
+
+    def _blocking_compress_file(self, src: Path):
+        try:
+            assert src.exists(), f"File {src} does not exist"
+            dst = src.with_suffix(src.suffix + ".xz")
+            with src.open("rb") as fin, lzma.open(dst, "wb", format=lzma.FORMAT_XZ, preset=9) as fout:
+                shutil.copyfileobj(fin, fout)
+            src.unlink()
+            return True
+        except Exception as e:
+            logger.error(f"Error compressing file {src}: {e}", exc_info=True)
+            return False
 
 async def main():
     send_stream, receive_stream = anyio.create_memory_object_stream(max_buffer_size=100)
