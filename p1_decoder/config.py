@@ -1,6 +1,7 @@
 """Configuration management using decouple."""
 
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from decouple import config
 
 # MQTT Configuration
@@ -16,3 +17,7 @@ OUTPUT_DIR = config("OUTPUT_DIR", cast=Path, default=Path("./cap"))
 # Writer Configuration
 FLUSH_LINES = config("FLUSH_LINES", cast=int, default=100)
 FLUSH_MINUTES = config("FLUSH_MINUTES", cast=int, default=1)
+
+# Timezone Configuration
+UTC = ZoneInfo("UTC")
+EUROPE_AMSTERDAM = ZoneInfo("Europe/Amsterdam")

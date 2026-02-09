@@ -4,6 +4,7 @@ from decouple import config
 import json
 import csv
 import re
+from p1_decoder._pipeline import parse_timestamp
 from p1_decoder.headers import code_lookup
 from tqdm import tqdm
 
@@ -92,46 +93,6 @@ def to_csv(path: Path = DATA_PATH):
                     row.append(None)
             writer.writerow(row)
 
-
-def parse_timestamp(timestamp: str):
-    """
-    The time data is always in LOCAL TIME for Europe/Amsterdam.
-    If the last character is a W it means we are in winter time,
-    and if it is a S it means we are in summer time.
-
-    The format is:
-        YYMMDDHHMMSS[W|S]
-
-    Example:
-        260207163214W
-        -> 2026-02-07 16:32:14 Europe/Amsterdam
-        260517120000S
-        -> 2026-05-17 12:00:00 Europe/Amsterdam
-
-    To avoid timezone switch issues, we will use W to mean UTC+1, and S to mean UTC+2.
-
-    Returns:
-        A parsed datetime object in Europe/Amsterdam timezone.
-    """
-    if len(timestamp) != 13:
-        raise ValueError(
-            "Timestamp must be 13 characters long. We got %s" % len(timestamp)
-        )
-    year = int(timestamp[:2]) + 2000
-    month = int(timestamp[2:4])
-    day = int(timestamp[4:6])
-    hour = int(timestamp[6:8])
-    minute = int(timestamp[8:10])
-    second = int(timestamp[10:12])
-    timezone_str = timestamp[12:14]
-
-    if timezone_str == "W":
-        timezone_value = timezone(timedelta(hours=1))
-    elif timezone_str == "S":
-        timezone_value = timezone(timedelta(hours=2))
-    else:
-        raise ValueError("Invalid timezone")
-    return datetime(year, month, day, hour, minute, second, tzinfo=timezone_value)
 
 
 def gas_csv(path: Path = DATA_PATH):

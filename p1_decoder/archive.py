@@ -13,7 +13,7 @@ from p1_decoder._anyio import setup_scope_signal_handlers
 from p1_decoder._mqtt import mqtt_subscriber
 import aiofiles
 
-from p1_decoder.writer import EUROPE_AMSTERDAM, UTC
+from p1_decoder.config import EUROPE_AMSTERDAM, UTC
 import logging
 
 logger = logging.getLogger(__name__)

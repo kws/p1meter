@@ -33,3 +33,25 @@ def read_codes(path: Path = CODES_PATH) -> Generator[Code, None, None]:
 def code_lookup(path: Path = CODES_PATH) -> dict[str, Code]:
     codes = read_codes(path)
     return {code.dsmr: code for code in codes}
+
+
+class HeaderTool:
+    def __init__(self, path: Path = CODES_PATH):
+        self.codes = code_lookup(path)
+        self.headers = {code.header: code for code in self.codes.values()}
+
+    def get_from_dsmr(self, dsmr: str) -> Code:
+        return self.codes.get(dsmr)
+
+    def get_from_header(self, header: str) -> Code:
+        return self.headers.get(header)
+
+    def rename_keys(self, telegram_dict: dict) -> dict:
+        output_dict = {}
+        for dsmr, value in telegram_dict.items():
+            code = self.get_from_dsmr(dsmr)
+            if code:
+                output_dict[code.header] = value
+            else:
+                output_dict[dsmr] = value
+        return output_dict
