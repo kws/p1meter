@@ -36,6 +36,7 @@ async def stream_data():
                 if last_gas_reading is not None:
                     delta = _get_gas_delta(last_gas_reading, gas_reading)
                     if delta is not None:
+                        print(f"Calculated gas delta: {delta} m3/hour")
                         gas_dict["m3_per_hour"] = delta
                 gas_json = json.dumps(gas_dict, cls=ValueJSONEncoder)
                 await send_stream.send(MQTTMessage(topic="dsmr/reading/gas", value=gas_json))
