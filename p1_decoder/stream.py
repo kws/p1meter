@@ -27,8 +27,7 @@ async def stream_data():
             parsed_telegram = telegram_to_dict(raw_telegram)
             electricity_reading, gas_reading = to_readings(parsed_telegram)
 
-            elec_json = json.dumps(electricity_reading, cls=ValueJSONEncoder)
-
+            elec_json = json.dumps(electricity_reading.to_dict(round=1), cls=ValueJSONEncoder)
             await send_stream.send(MQTTMessage(topic="dsmr/reading/electricity", value=elec_json))
 
             if gas_reading != last_gas_reading:

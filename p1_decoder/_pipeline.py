@@ -1,8 +1,18 @@
 from dataclasses import dataclass
+from functools import partial
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Callable
 
 TELEGRAM_PTN = re.compile(r"^\d-\d:")
+
+
+def rounder(ndigits: int) -> Callable[[str], float]:
+    if ndigits < 0:
+        return float
+    elif ndigits == 0:
+        return lambda val: int(float(val))
+    return lambda val: round(float(val), ndigits)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -40,29 +50,30 @@ class ElectricityReading:
     power_export_l2_kw: Value
     power_export_l3_kw: Value
 
-    def to_dict(self) -> dict:
+    def to_dict(self, round: int = -1) -> dict:
+        tofloat = rounder(round)
         return {
             "timestamp": self.timestamp,
             "meter_id": self.meter_id,
-            "import_t1_kwh": float(self.import_t1_kwh.value),
-            "import_t2_kwh": float(self.import_t2_kwh.value),
-            "export_t1_kwh": float(self.export_t1_kwh.value),
-            "export_t2_kwh": float(self.export_t2_kwh.value),
+            "import_t1_kwh": tofloat(self.import_t1_kwh.value),
+            "import_t2_kwh": tofloat(self.import_t2_kwh.value),
+            "export_t1_kwh": tofloat(self.export_t1_kwh.value),
+            "export_t2_kwh": tofloat(self.export_t2_kwh.value),
             "active_tariff": int(self.active_tariff.value),
-            "power_import_kw": float(self.power_import_kw.value),
-            "power_export_kw": float(self.power_export_kw.value),
-            "voltage_l1_v": float(self.voltage_l1_v.value),
-            "voltage_l2_v": float(self.voltage_l2_v.value),
-            "voltage_l3_v": float(self.voltage_l3_v.value),
-            "current_l1_a": float(self.current_l1_a.value),
-            "current_l2_a": float(self.current_l2_a.value),
-            "current_l3_a": float(self.current_l3_a.value),
-            "power_import_l1_kw": float(self.power_import_l1_kw.value),
-            "power_import_l2_kw": float(self.power_import_l2_kw.value),
-            "power_import_l3_kw": float(self.power_import_l3_kw.value),
-            "power_export_l1_kw": float(self.power_export_l1_kw.value),
-            "power_export_l2_kw": float(self.power_export_l2_kw.value),
-            "power_export_l3_kw": float(self.power_export_l3_kw.value),
+            "power_import_kw": tofloat(self.power_import_kw.value),
+            "power_export_kw": tofloat(self.power_export_kw.value),
+            "voltage_l1_v": tofloat(self.voltage_l1_v.value),
+            "voltage_l2_v": tofloat(self.voltage_l2_v.value),
+            "voltage_l3_v": tofloat(self.voltage_l3_v.value),
+            "current_l1_a": tofloat(self.current_l1_a.value),
+            "current_l2_a": tofloat(self.current_l2_a.value),
+            "current_l3_a": tofloat(self.current_l3_a.value),
+            "power_import_l1_kw": tofloat(self.power_import_l1_kw.value),
+            "power_import_l2_kw": tofloat(self.power_import_l2_kw.value),
+            "power_import_l3_kw": tofloat(self.power_import_l3_kw.value),
+            "power_export_l1_kw": tofloat(self.power_export_l1_kw.value),
+            "power_export_l2_kw": tofloat(self.power_export_l2_kw.value),
+            "power_export_l3_kw": tofloat(self.power_export_l3_kw.value),
         }
 
 @dataclass(frozen=True, slots=True, kw_only=True)
