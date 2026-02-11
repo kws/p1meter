@@ -1,5 +1,5 @@
 from p1_decoder._mqtt import mqtt_publisher, mqtt_subscriber, MQTTMessage
-from p1_decoder._pipeline import GasReading, Value, telegram_to_dict, to_readings
+from p1_decoder._pipeline import ElectricityReading, GasReading, Value, telegram_to_dict, to_readings
 import anyio
 import json
 
@@ -22,12 +22,14 @@ def _get_gas_delta(old_reading: GasReading, new_reading: GasReading) -> float:
         
 async def stream_data():
     last_gas_reading: GasReading | None = None
+    last_electricity_reading: ElectricityReading | None = None
     async with mqtt_publisher() as send_stream:
         async for raw_telegram in mqtt_subscriber():
             parsed_telegram = telegram_to_dict(raw_telegram)
             electricity_reading, gas_reading = to_readings(parsed_telegram)
+            electricity_reading = electricity_reading.only_changes(last_electricity_reading, tolerance=0.1)
 
-            elec_json = json.dumps(electricity_reading.to_dict(round=1), cls=ValueJSONEncoder)
+            elec_json = json.dumps(electricity_reading.to_dict(), cls=ValueJSONEncoder)
             await send_stream.send(MQTTMessage(topic="dsmr/reading/electricity", value=elec_json))
 
             if gas_reading != last_gas_reading:
@@ -41,7 +43,7 @@ async def stream_data():
                 await send_stream.send(MQTTMessage(topic="dsmr/reading/gas", value=gas_json))
 
             last_gas_reading = gas_reading
-    
+            last_electricity_reading = electricity_reading
 
 
 

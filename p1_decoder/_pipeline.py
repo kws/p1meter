@@ -76,6 +76,32 @@ class ElectricityReading:
             "power_export_l3_kw": tofloat(self.power_export_l3_kw.value),
         }
 
+    def only_changes(self, last_reading: "ElectricityReading | None", tolerance: float = 0.1) -> "ElectricityReading | None":
+        if last_reading is None:
+            return self
+
+        new_reading = {
+            "timestamp": self.timestamp,
+            "meter_id": self.meter_id,
+        }
+
+        for field in self.__dataclass_fields__:
+            if field in ["timestamp", "meter_id"]:
+                continue
+            value_obj = getattr(self, field)
+            value = float(value_obj.value)
+
+            old_value_obj = getattr(last_reading, field)
+            old_value = float(old_value_obj.value)
+
+            if abs(value - old_value) > tolerance:
+                new_reading[field] = value_obj
+            else:
+                new_reading[field] = old_value_obj
+
+        return ElectricityReading(**new_reading)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class GasReading:
     timestamp: int
