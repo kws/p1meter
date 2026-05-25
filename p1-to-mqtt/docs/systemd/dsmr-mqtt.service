@@ -1,20 +1,14 @@
 [Unit]
 Description=DSMR to MQTT Bridge
-Documentation=https://github.com/kws/p1-to-mqtt
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi
-EnvironmentFile=-/etc/dsmr-mqtt.conf
-ExecStart=/home/pi/p1/dsmr-mqtt-linux-arm64 \
-  -serial-device /dev/ttyUSB0 \
-  -mqtt-broker tcp://localhost:1883 \
-  -mqtt-client-id dsmr-bridge \
-  -mqtt-username mqttuser
+User=dsmr
+SupplementaryGroups=dialout
+EnvironmentFile=/etc/dsmr-mqtt.conf
+ExecStart=/usr/local/bin/dsmr-mqtt
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -30,4 +24,3 @@ LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
-

@@ -1,6 +1,9 @@
-# DSMR → MQTT Bridge
+# DSMR -> MQTT Bridge
 
 A small, reliable daemon that reads raw DSMR P1 telegrams from a Dutch smart meter over a serial connection and publishes them unchanged to MQTT for downstream decoding and processing.
+
+This package lives inside the P1 smart meter monorepo. The paired decoder is in
+`../p1-decoder`.
 
 ## Features
 
@@ -38,7 +41,7 @@ make build-pi32
 
 ```bash
 ./bin/dsmr-mqtt \
-  -serial-device /dev/ttyUSB0 \
+  -serial-device /dev/serial/by-id/usb-FTDI_P1_CABLE-if00-port0 \
   -mqtt-broker tcp://localhost:1883 \
   -mqtt-client-id dsmr-bridge \
   -mqtt-username myuser \
@@ -48,7 +51,7 @@ make build-pi32
 Or using environment variables:
 
 ```bash
-export DSMR_SERIAL_DEVICE=/dev/ttyUSB0
+export DSMR_SERIAL_DEVICE=/dev/serial/by-id/usb-FTDI_P1_CABLE-if00-port0
 export DSMR_MQTT_BROKER=tcp://localhost:1883
 export DSMR_MQTT_CLIENT_ID=dsmr-bridge
 export DSMR_MQTT_USERNAME=myuser
@@ -86,7 +89,6 @@ Environment variables take precedence over command-line flags.
 | Topic               | Retained | Payload                   |
 | ------------------- | -------- | ------------------------- |
 | `dsmr/raw/telegram` | No       | Full DSMR telegram text   |
-| `dsmr/raw/latest`   | Yes      | Most recent full telegram |
 | `dsmr/status`       | Yes      | `online` / `offline`      |
 
 All topics use QoS 1. The `dsmr/status` topic uses Last Will and Testament to publish `offline` if the connection is lost unexpectedly.
@@ -156,23 +158,26 @@ Example systemd service file (`/etc/systemd/system/dsmr-mqtt.service`):
 ```ini
 [Unit]
 Description=DSMR to MQTT Bridge
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-ExecStart=/home/pi/dsmr-mqtt \
-  -serial-device /dev/ttyUSB0 \
-  -mqtt-broker tcp://localhost:1883 \
-  -mqtt-client-id dsmr-bridge \
-  -mqtt-username myuser \
-  -mqtt-password mypass
+User=dsmr
+SupplementaryGroups=dialout
+EnvironmentFile=/etc/dsmr-mqtt.conf
+ExecStart=/usr/local/bin/dsmr-mqtt
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+Put broker, client ID, serial device, username, and password in
+`/etc/dsmr-mqtt.conf` so credentials do not appear in the process list.
 
 Enable and start the service:
 
@@ -204,4 +209,3 @@ All components communicate via Go channels to prevent blocking.
 ## License
 
 See LICENSE file for details.
-

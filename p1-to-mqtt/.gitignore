@@ -5,7 +5,10 @@ bin/
 *.dll
 *.so
 *.dylib
-dsmr-mqtt
+/dsmr-mqtt
+
+# Local convenience tasks
+justfile
 
 # Test binary, built with `go test -c`
 *.test
