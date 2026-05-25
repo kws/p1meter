@@ -1,8 +1,19 @@
 # P1 Smart Meter
 
-This repository is the source of truth for the home DSMR/P1 smart meter
-pipeline. It is a monorepo because the serial bridge, MQTT topics, Python
-decoder, Docker runtime, and OpenHAB integration are tightly coupled.
+Many Dutch smart meters expose a local "P1" serial port that emits DSMR
+telegrams: plain-text snapshots of electricity and gas meter readings. This
+project turns those telegrams into MQTT messages that can be consumed by home
+automation systems, dashboards, or archivers.
+
+The pipeline has two parts:
+
+1. A small Go bridge reads the P1 serial port and publishes each raw DSMR
+   telegram to MQTT.
+2. A Python decoder subscribes to those raw telegrams, parses the useful fields,
+   and republishes structured electricity and gas readings.
+
+The two pieces live together because they share the same MQTT topics and data
+contract.
 
 ## Layout
 
@@ -12,12 +23,9 @@ decoder, Docker runtime, and OpenHAB integration are tightly coupled.
   parses them, and publishes structured electricity and gas readings.
 - `p1-decoder/docker/`: Docker Compose runtime for the Python decoder services.
 
-The `p1-to-mqtt` and `p1-decoder` histories were imported with `git subtree` so
-the old project history is still available inside this repository.
-
 ## Deployment Topology
 
-The intended deployment shape is:
+A typical deployment looks like this:
 
 1. Smart meter P1 USB cable is attached to a small always-on host.
 2. The Go bridge runs as a service on that host and reads the P1 serial device.
@@ -27,9 +35,9 @@ The intended deployment shape is:
    to `dsmr/reading/electricity` and `dsmr/reading/gas`.
 6. A home automation system such as OpenHAB consumes those structured topics.
 
-The compose file also defines an archive service named `p1-decoder`. The live
-deployment can run either or both services depending on whether raw telegram
-archiving is wanted.
+The Docker Compose file also defines an archive service named `p1-decoder`. You
+can run either or both Python services depending on whether raw telegram
+archiving is useful for your setup.
 
 ## MQTT Topics
 
@@ -40,15 +48,14 @@ archiving is wanted.
 | `dsmr/reading/electricity` | `p1-stream` | OpenHAB | parsed electricity JSON |
 | `dsmr/reading/gas` | `p1-stream` | OpenHAB | parsed gas JSON |
 
-## Deployment Direction
+## Deployment Notes
 
-The bridge should run as a systemd service managed by infrastructure
-configuration. The service should use an environment file for MQTT credentials
-and a stable `/dev/serial/by-id/...` path for the P1 cable.
+The bridge is intended to run as a systemd service. Use an environment file for
+MQTT credentials and prefer a stable `/dev/serial/by-id/...` path for the P1
+cable instead of `/dev/ttyUSB0`.
 
-The Python decoder should be built as a Docker image and deployed from that
-image rather than relying on a checked-out source tree on the Docker host. The
-next step is to add GitHub Actions for:
+The Python decoder is intended to run in Docker. The next project step is to add
+GitHub Actions for:
 
 1. Building the Go bridge binary for `linux/arm64`.
 2. Building and pushing the Python decoder image to Docker Hub.
