@@ -1,0 +1,20 @@
+# DSMR MQTT Bridge Configuration
+# Copy this file to /etc/dsmr-mqtt.conf and set your password
+# Make sure the file is readable only by root: chmod 600 /etc/dsmr-mqtt.conf
+#
+# The password will be read from the DSMR_MQTT_PASSWORD environment variable
+# which is set by this file. The application will use it automatically.
+
+DSMR_MQTT_PASSWORD=your_password_here
+
+# Optional: Override other settings (these are already set in the service file)
+# DSMR_SERIAL_DEVICE=/dev/ttyUSB0
+# DSMR_MQTT_BROKER=tcp://localhost:1883
+# DSMR_MQTT_CLIENT_ID=dsmr-bridge
+# DSMR_MQTT_USERNAME=mqttuser
+# DSMR_MQTT_TLS=1
+# DSMR_VERBOSE=false
+
+# Security Note: For production, use TLS to encrypt connections:
+# - Use ssl:// or tls:// URL scheme, or
+# - Set DSMR_MQTT_TLS=1 with tcp:// URL
