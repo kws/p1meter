@@ -59,12 +59,8 @@ The Python decoder is intended to run in Docker. GitHub Actions builds:
 1. The Go bridge binary for `linux/arm64`.
 2. The Python decoder Docker image.
 
-The Docker image workflow publishes `docker.io/kajws/p1-decoder` on pushes to
-`main` and version tags. Configure these repository secrets before expecting a
-push to Docker Hub:
-
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
+The Docker image workflow publishes `ghcr.io/kws/p1-decoder` on pushes to
+`main` and version tags using the built-in GitHub Actions token.
 
 ## License
 
