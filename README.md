@@ -15,26 +15,21 @@ decoder, Docker runtime, and OpenHAB integration are tightly coupled.
 The `p1-to-mqtt` and `p1-decoder` histories were imported with `git subtree` so
 the old project history is still available inside this repository.
 
-## Live Topology
+## Deployment Topology
 
-As of 2026-05-25, the working deployment is:
+The intended deployment shape is:
 
-1. Smart meter P1 USB cable is attached to `edge-host`.
-2. `edge-host` runs `dsmr-mqtt-linux-arm64` from `/opt/p1`, currently in a
-   user `tmux` session.
-3. The Go bridge reads `/dev/ttyUSB0`; the stable device path is
-   `/dev/serial/by-id/usb-FTDI_P1_CABLE-if00-port0`.
-4. The bridge publishes raw telegrams to Mosquitto on `mqtt-broker:1883`.
-5. `docker-host` runs the `p1-stream` Docker container from the Python decoder
-   compose stack.
-6. `p1-stream` subscribes to `dsmr/raw/telegram` and publishes structured JSON
+1. Smart meter P1 USB cable is attached to a small always-on host.
+2. The Go bridge runs as a service on that host and reads the P1 serial device.
+3. The bridge publishes raw telegrams to an MQTT broker.
+4. The Python `p1-stream` service runs in Docker.
+5. `p1-stream` subscribes to `dsmr/raw/telegram` and publishes structured JSON
    to `dsmr/reading/electricity` and `dsmr/reading/gas`.
-7. OpenHAB on `mqtt-broker` consumes those structured topics from
-   `/etc/openhab/things/p1.things`.
+6. A home automation system such as OpenHAB consumes those structured topics.
 
 The compose file also defines an archive service named `p1-decoder`. The live
-scan on 2026-05-25 found `p1-stream` running and the archive service stopped, so
-the current OpenHAB status depends on `p1-stream`.
+deployment can run either or both services depending on whether raw telegram
+archiving is wanted.
 
 ## MQTT Topics
 
@@ -47,10 +42,9 @@ the current OpenHAB status depends on `p1-stream`.
 
 ## Deployment Direction
 
-The current bridge process on `edge-host` should move from `tmux` into a
-systemd service managed by infrastructure configuration. The service should use
-an environment file for MQTT credentials and the stable `/dev/serial/by-id/...`
-path for the P1 cable.
+The bridge should run as a systemd service managed by infrastructure
+configuration. The service should use an environment file for MQTT credentials
+and a stable `/dev/serial/by-id/...` path for the P1 cable.
 
 The Python decoder should be built as a Docker image and deployed from that
 image rather than relying on a checked-out source tree on the Docker host. The

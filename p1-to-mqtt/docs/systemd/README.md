@@ -3,10 +3,9 @@
 This guide describes the intended systemd deployment for the DSMR MQTT bridge on
 the Raspberry Pi attached to the smart meter.
 
-The current live deployment on `edge-host` still runs the bridge manually from a
-`tmux` session. The target state is to install the cross-compiled binary as a
-service, keep MQTT credentials out of the process list, and use the stable P1
-USB serial symlink instead of `/dev/ttyUSB0`.
+The target state is to install the cross-compiled binary as a service, keep
+MQTT credentials out of the process list, and use the stable P1 USB serial
+symlink instead of `/dev/ttyUSB0`.
 
 ## Files
 
@@ -29,8 +28,8 @@ sudo install -m 0644 docs/systemd/dsmr-mqtt.service /etc/systemd/system/dsmr-mqt
 sudo install -m 0600 docs/systemd/dsmr-mqtt.conf.example /etc/dsmr-mqtt.conf
 ```
 
-Edit `/etc/dsmr-mqtt.conf` and set the real MQTT credentials. The live
-`edge-host` serial cable currently appears as:
+Edit `/etc/dsmr-mqtt.conf` and set the real MQTT credentials. Prefer a stable
+serial symlink like:
 
 ```text
 /dev/serial/by-id/usb-FTDI_P1_CABLE-if00-port0
@@ -74,8 +73,8 @@ id dsmr
 Check broker connectivity:
 
 ```bash
-getent hosts mqtt-broker
-nc -vz mqtt-broker 1883
+getent hosts mqtt-broker.local
+nc -vz mqtt-broker.local 1883
 ```
 
 Temporarily set `DSMR_VERBOSE=1` in `/etc/dsmr-mqtt.conf` for more detailed

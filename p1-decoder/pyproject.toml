@@ -3,7 +3,7 @@ name = "p1-decoder"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "P1 Maintainers",email = "maintainers@example.com"}
+    {name = "P1 Maintainers"}
 ]
 readme = "README.md"
 requires-python = ">=3.11,<4.0"
@@ -24,4 +24,3 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.15.0"
-

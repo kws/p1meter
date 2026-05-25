@@ -6,7 +6,7 @@
 #   sudo chmod 600 /etc/dsmr-mqtt.conf
 
 DSMR_SERIAL_DEVICE=/dev/serial/by-id/usb-FTDI_P1_CABLE-if00-port0
-DSMR_MQTT_BROKER=tcp://mqtt-broker:1883
+DSMR_MQTT_BROKER=tcp://mqtt-broker.local:1883
 DSMR_MQTT_CLIENT_ID=dsmr-bridge
 DSMR_MQTT_USERNAME=your_mqtt_username
 DSMR_MQTT_PASSWORD=your_mqtt_password

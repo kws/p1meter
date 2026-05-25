@@ -14,8 +14,9 @@ is in `../p1-to-mqtt`.
 - `python -m p1_decoder.archive`: subscribes to raw telegrams and writes archive
   files under `/app/archive`.
 
-The live deployment on 2026-05-25 had `p1-stream` running on `docker-host`. The
-archive container existed but was stopped.
+The stream and archive services can be run independently. Most home automation
+setups only need `p1-stream`; `p1-decoder` is useful when you also want a raw
+telegram archive.
 
 ## Configuration
 
