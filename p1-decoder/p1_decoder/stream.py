@@ -29,8 +29,10 @@ async def stream_data():
             electricity_reading, gas_reading = to_readings(parsed_telegram)
             electricity_reading = electricity_reading.only_changes(last_electricity_reading, tolerance=0.1)
 
-            elec_json = json.dumps(electricity_reading.to_dict(), cls=ValueJSONEncoder)
-            await send_stream.send(MQTTMessage(topic="dsmr/reading/electricity", value=elec_json))
+            if electricity_reading is not None:
+                elec_json = json.dumps(electricity_reading.to_dict(), cls=ValueJSONEncoder)
+                await send_stream.send(MQTTMessage(topic="dsmr/reading/electricity", value=elec_json))
+                last_electricity_reading = electricity_reading
 
             if gas_reading != last_gas_reading:
                 gas_dict = gas_reading.to_dict()
@@ -43,7 +45,6 @@ async def stream_data():
                 await send_stream.send(MQTTMessage(topic="dsmr/reading/gas", value=gas_json))
 
             last_gas_reading = gas_reading
-            last_electricity_reading = electricity_reading
 
 
 

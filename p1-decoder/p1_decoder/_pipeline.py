@@ -1,10 +1,21 @@
 from dataclasses import dataclass
-from functools import partial
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 TELEGRAM_PTN = re.compile(r"^\d-\d:")
+INSTANTANEOUS_POWER_FIELDS = frozenset(
+    {
+        "power_import_kw",
+        "power_export_kw",
+        "power_import_l1_kw",
+        "power_import_l2_kw",
+        "power_import_l3_kw",
+        "power_export_l1_kw",
+        "power_export_l2_kw",
+        "power_export_l3_kw",
+    }
+)
 
 
 def rounder(ndigits: int) -> Callable[[str], float]:
@@ -84,6 +95,7 @@ class ElectricityReading:
             "timestamp": self.timestamp,
             "meter_id": self.meter_id,
         }
+        changed = False
 
         for field in self.__dataclass_fields__:
             if field in ["timestamp", "meter_id"]:
@@ -94,10 +106,20 @@ class ElectricityReading:
             old_value_obj = getattr(last_reading, field)
             old_value = float(old_value_obj.value)
 
-            if abs(value - old_value) > tolerance:
+            zero_power_transition = (
+                field in INSTANTANEOUS_POWER_FIELDS
+                and value == 0
+                and old_value != 0
+            )
+
+            if zero_power_transition or abs(value - old_value) > tolerance:
                 new_reading[field] = value_obj
+                changed = True
             else:
                 new_reading[field] = old_value_obj
+
+        if not changed:
+            return None
 
         return ElectricityReading(**new_reading)
 
@@ -229,5 +251,3 @@ def to_readings(telegram_dict: dict) -> tuple[ElectricityReading, GasReading]:
     )
 
     return electricity_reading, gas_reading
-
-
