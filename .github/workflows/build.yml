@@ -107,7 +107,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: docker.io/kws/p1-decoder
+          images: docker.io/kajws/p1-decoder
           tags: |
             type=ref,event=branch
             type=ref,event=pr
