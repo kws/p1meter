@@ -18,6 +18,14 @@ The stream and archive services can be run independently. Most home automation
 setups only need `p1-stream`; `p1-decoder` is useful when you also want a raw
 telegram archive.
 
+The electricity payload preserves the DSMR instantaneous import/export fields
+and also includes derived phase-summed fields:
+
+- `power_import_phase_sum_kw`: sum of L1/L2/L3 import.
+- `power_export_phase_sum_kw`: sum of L1/L2/L3 export.
+- `power_net_kw`: import phase sum minus export phase sum; positive means net
+  importing, negative means net exporting.
+
 ## Configuration
 
 Configuration is read from environment variables:

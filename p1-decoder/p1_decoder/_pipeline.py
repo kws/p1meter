@@ -1,19 +1,26 @@
 from dataclasses import dataclass
+from decimal import Decimal
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 TELEGRAM_PTN = re.compile(r"^\d-\d:")
+POWER_IMPORT_PHASE_FIELDS = (
+    "power_import_l1_kw",
+    "power_import_l2_kw",
+    "power_import_l3_kw",
+)
+POWER_EXPORT_PHASE_FIELDS = (
+    "power_export_l1_kw",
+    "power_export_l2_kw",
+    "power_export_l3_kw",
+)
 INSTANTANEOUS_POWER_FIELDS = frozenset(
     {
         "power_import_kw",
         "power_export_kw",
-        "power_import_l1_kw",
-        "power_import_l2_kw",
-        "power_import_l3_kw",
-        "power_export_l1_kw",
-        "power_export_l2_kw",
-        "power_export_l3_kw",
+        *POWER_IMPORT_PHASE_FIELDS,
+        *POWER_EXPORT_PHASE_FIELDS,
     }
 )
 
@@ -61,8 +68,15 @@ class ElectricityReading:
     power_export_l2_kw: Value
     power_export_l3_kw: Value
 
+    def _sum_fields(self, fields: tuple[str, ...]) -> Decimal:
+        return sum((Decimal(getattr(self, field).value) for field in fields), Decimal("0"))
+
     def to_dict(self, round: int = -1) -> dict:
         tofloat = rounder(round)
+        power_import_phase_sum_kw = self._sum_fields(POWER_IMPORT_PHASE_FIELDS)
+        power_export_phase_sum_kw = self._sum_fields(POWER_EXPORT_PHASE_FIELDS)
+        power_net_kw = power_import_phase_sum_kw - power_export_phase_sum_kw
+
         return {
             "timestamp": self.timestamp,
             "meter_id": self.meter_id,
@@ -85,6 +99,9 @@ class ElectricityReading:
             "power_export_l1_kw": tofloat(self.power_export_l1_kw.value),
             "power_export_l2_kw": tofloat(self.power_export_l2_kw.value),
             "power_export_l3_kw": tofloat(self.power_export_l3_kw.value),
+            "power_import_phase_sum_kw": tofloat(str(power_import_phase_sum_kw)),
+            "power_export_phase_sum_kw": tofloat(str(power_export_phase_sum_kw)),
+            "power_net_kw": tofloat(str(power_net_kw)),
         }
 
     def only_changes(self, last_reading: "ElectricityReading | None", tolerance: float = 0.1) -> "ElectricityReading | None":

@@ -77,6 +77,22 @@ class ElectricityReadingChangesTest(unittest.TestCase):
         self.assertEqual(changed.current_l1_a.value, "1.200")
         self.assertEqual(changed.voltage_l1_v.value, "230.000")
 
+    def test_to_dict_includes_phase_sums_and_signed_net(self):
+        reading = electricity_reading(
+            power_import_l1_kw=Value(value="0.000", unit="kW"),
+            power_import_l2_kw=Value(value="0.000", unit="kW"),
+            power_import_l3_kw=Value(value="0.279", unit="kW"),
+            power_export_l1_kw=Value(value="0.000", unit="kW"),
+            power_export_l2_kw=Value(value="0.761", unit="kW"),
+            power_export_l3_kw=Value(value="0.000", unit="kW"),
+        )
+
+        data = reading.to_dict()
+
+        self.assertEqual(data["power_import_phase_sum_kw"], 0.279)
+        self.assertEqual(data["power_export_phase_sum_kw"], 0.761)
+        self.assertEqual(data["power_net_kw"], -0.482)
+
 
 if __name__ == "__main__":
     unittest.main()
