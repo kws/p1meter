@@ -54,11 +54,17 @@ The bridge is intended to run as a systemd service. Use an environment file for
 MQTT credentials and prefer a stable `/dev/serial/by-id/...` path for the P1
 cable instead of `/dev/ttyUSB0`.
 
-The Python decoder is intended to run in Docker. The next project step is to add
-GitHub Actions for:
+The Python decoder is intended to run in Docker. GitHub Actions builds:
 
-1. Building the Go bridge binary for `linux/arm64`.
-2. Building and pushing the Python decoder image to Docker Hub.
+1. The Go bridge binary for `linux/arm64`.
+2. The Python decoder Docker image.
+
+The Docker image workflow publishes `docker.io/kws/p1-decoder` on pushes to
+`main` and version tags. Configure these repository secrets before expecting a
+push to Docker Hub:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
 
 ## License
 

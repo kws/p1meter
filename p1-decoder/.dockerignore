@@ -1,0 +1,17 @@
+.env
+.ruff_cache/
+.venv/
+__pycache__/
+**/__pycache__/
+
+archive/
+docker/.env
+docker/archive/
+logs/
+logs.csv
+logs.gas.csv
+
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
