@@ -52,3 +52,7 @@ next step is to add GitHub Actions for:
 
 1. Building the Go bridge binary for `linux/arm64`.
 2. Building and pushing the Python decoder image to Docker Hub.
+
+## License
+
+MIT. See `LICENSE`.
